@@ -1,0 +1,14 @@
+services:
+  gastos:
+    build: .
+    container_name: gastos
+    restart: unless-stopped
+    ports:
+      # Puerto publicado = el del túnel de Cloudflare (http://localhost:8234).
+      # Solo escucha en localhost; quita "127.0.0.1:" si necesitas acceder desde la red local.
+      - "127.0.0.1:8234:3000"
+    env_file: .env
+    environment:
+      DB_PATH: /data/gastos.db
+    volumes:
+      - ./data:/data

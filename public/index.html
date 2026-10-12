@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<title>Mis gastos</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--tx:#1d2330;--mut:#6b7385;--bd:#dde1e8;--pri:#2563eb;--neg:#c62828;--pos:#2e7d32}
+@media(prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2029;--tx:#e6e9f0;--mut:#9099ad;--bd:#2c3340;--pri:#6c9bff;--neg:#ff7b72;--pos:#62d26f}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--tx)}
+header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:5}
+header h1{font-size:18px;margin:0 auto 0 0}
+main{max-width:1100px;margin:0 auto;padding:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:12px}
+button,input,select{font:inherit;color:inherit;background:var(--card);border:1px solid var(--bd);border-radius:6px;padding:6px 10px}
+button{cursor:pointer}button.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
+.row label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:2px}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%}
+th,td{padding:6px 8px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}
+th{font-size:12px;color:var(--mut)}td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.ed{cursor:text;user-select:none}td.ed:hover{background:rgba(127,127,127,.1)}
+.neg{color:var(--neg)}.pos{color:var(--pos)}.mut{color:var(--mut);font-size:12px}
+.editor{width:100%;min-width:90px}
+dialog{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx);max-width:min(760px,96vw);width:100%;padding:16px}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+dialog h2{margin:0 0 10px;font-size:17px}
+.cw{height:260px;position:relative}
+#login{max-width:340px;margin:12vh auto;padding:16px}
+#login input{width:100%;margin-bottom:8px}#err{color:var(--neg);font-size:13px}
+.real{width:110px;text-align:right}
+</style>
+</head>
+<body>
+
+<div id="login" class="card" hidden>
+  <h2>🔒 Acceso</h2>
+  <p class="mut">Solo pueden entrar usuarios registrados por el administrador.</p>
+  <input id="lu" placeholder="Usuario" autocomplete="username">
+  <input id="lp" type="password" placeholder="Contraseña" autocomplete="current-password">
+  <button class="pri" id="lb" style="width:100%">Entrar</button>
+  <p id="err"></p>
+</div>
+
+<div id="app" hidden>
+<header>
+  <h1>💶 Mis gastos</h1>
+  <button id="bAcc">Cuentas y saldos</button>
+  <button id="bStats">Gastos por tipo</button>
+  <button id="bTypes">Tipos</button>
+  <button id="btnUsers" hidden>Usuarios</button>
+  <a href="https://t.me/gestioncuentas_bot" target="_blank" rel="noopener noreferrer" title="Abrir el bot de Telegram"><button type="button">🤖 Bot</button></a>
+  <button id="bHelp" title="Ayuda">❓</button>
+  <span class="mut" id="who"></span>
+  <button id="bOut">Salir</button>
+</header>
+<main>
+  <section class="card">
+    <div class="row" style="justify-content:space-between"><strong>Evolución del dinero total</strong>
+      <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="incJoint"> incluir cuentas conjuntas</label></div>
+    <div class="cw"><canvas id="chart"></canvas></div>
+  </section>
+
+  <section class="card">
+    <strong>Nuevo movimiento</strong>
+    <form id="addForm" class="row" style="margin-top:8px">
+      <label>Tipo<select id="fType" required></select></label>
+      <label>Cuenta<select id="fAcc" required></select></label>
+      <label>Importe (− gasto / + ingreso)<input id="fAmt" required inputmode="decimal" placeholder="-12,50" style="width:150px"></label>
+      <label>Descripción<input id="fDesc" maxlength="200"></label>
+      <label>Relacionado con ID<input id="fRel" type="number" min="1" style="width:110px"></label>
+      <label>Fecha (vacío = ahora)<input id="fDate" type="datetime-local"></label>
+      <button class="pri">Añadir</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <label>Desde<input type="date" id="flFrom"></label>
+      <label>Hasta<input type="date" id="flTo"></label>
+      <label>Tipo<select id="flType"></select></label>
+      <label>Cuenta<select id="flAcc"></select></label>
+      <label>Descripción<input id="flQ" placeholder="contiene…"></label>
+      <button id="flClear">Limpiar</button>
+    </div>
+    <p class="mut" id="info"></p>
+    <div class="tw"><table>
+      <thead><tr><th>ID</th><th>Fecha</th><th>Tipo</th><th>Cuenta</th><th>Descripción</th><th class="num">Importe</th><th>Rel.</th><th></th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table></div>
+    <p class="mut">Doble clic (o mantener pulsado en el móvil) para editar. Enter o salir del campo para terminar.</p>
+  </section>
+</main>
+</div>
+
+<dialog id="dHelp"><h2>Ayuda</h2>
+<div>
+<p><b>Web</b></p>
+<ul>
+<li>Añade movimientos con el formulario: importe negativo = gasto, positivo = ingreso. La fecha por defecto es ahora.</li>
+<li>El listado muestra los últimos 50; si usas filtros muestra todos los resultados.</li>
+<li>Edita fecha, tipo, cuenta, descripción, importe o relación con doble clic (móvil: mantener pulsado). Se pide confirmación.</li>
+<li><b>Relación</b>: pon en "Rel." el ID de otro movimiento (p. ej. un gasto de 200 € en efectivo y 3 ingresos de 50 € por Bizum, todos relacionados con el ID del gasto).</li>
+<li><b>Cuentas y saldos</b>: crea cuentas, actívalas/desactívalas e indica el saldo real. Se compara con el calculado y se muestra la discrepancia (✔️ si coincide).</li>
+<li><b>Gastos por tipo</b>: neto de los últimos 4 meses y media mensual del periodo elegido.</li>
+<li><b>Tipos</b>: crea o elimina tipos. Si un tipo tiene movimientos, deberás moverlos a otro tipo antes de borrarlo.</li>
+<li>Las cuentas conjuntas no cuentan en tu dinero total personal.</li>
+</ul>
+<p><b>Bot de Telegram</b> (<a href="https://t.me/gestioncuentas_bot" target="_blank" rel="noopener noreferrer">t.me/gestioncuentas_bot</a>, solo usuarios registrados): /nuevo, /borrar, /ultimos, /saldos, /saldoreal, /activar, /desactivar, /nuevotipo, /tipos, /web (enlace a esta web), /help. Recibes un informe diario a las 9:00 y uno mensual el día 1 a las 9:00.</p>
+</div>
+<form method="dialog"><button>Cerrar</button></form></dialog>
+
+<dialog id="dAcc"><h2>Cuentas y saldos</h2>
+<div class="tw"><table>
+<thead><tr><th>Cuenta</th><th>Tipo</th><th>Activa</th><th class="num">Calculado</th><th class="num">Saldo real</th><th class="num">Discrepancia</th></tr></thead>
+<tbody id="accBody"></tbody></table></div>
+<p class="mut" id="accTot"></p>
+<hr><strong>Añadir cuenta</strong>
+<form id="accForm" class="row" style="margin-top:8px">
+  <label>Nombre<input id="aName" required maxlength="40"></label>
+  <label>Saldo actual (genera un movimiento «situación inicial» en el tipo Otros)<input id="aBal" inputmode="decimal" value="0,00" style="width:120px"></label>
+  <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="aJoint"> Conjunta</label>
+  <button class="pri">Crear</button>
+</form>
+<form method="dialog" style="margin-top:10px"><button>Cerrar</button></form></dialog>
+
+<dialog id="dStats"><h2>Gastos por tipo</h2>
+<label class="mut">Media mensual de los últimos
+<select id="months"><option value="6">6 meses</option><option value="12">1 año</option><option value="24" selected>2 años</option><option value="36">3 años</option><option value="48">4 años</option><option value="60">5 años</option><option value="0">Total registrado</option></select></label>
+<div class="tw"><table><thead id="stHead"></thead><tbody id="stBody"></tbody></table></div>
+<form method="dialog" style="margin-top:10px"><button>Cerrar</button></form></dialog>
+
+<dialog id="dTypes"><h2>Tipos</h2>
+<table><tbody id="tyBody"></tbody></table>
+<div id="reassign" hidden class="card"><p id="reMsg"></p><select id="reSel"></select> <button id="reOk" class="pri">Mover y eliminar</button> <button id="reNo">Cancelar</button></div>
+<form id="tyForm" class="row" style="margin-top:8px"><label>Nuevo tipo<input id="tyName" required maxlength="40"></label><button class="pri">Añadir</button></form>
+<form method="dialog" style="margin-top:10px"><button>Cerrar</button></form></dialog>
+
+<dialog id="dUsers"><h2>Usuarios</h2>
+<div class="tw"><table><thead><tr><th>Usuario</th><th>ID Telegram</th><th></th></tr></thead><tbody id="usBody"></tbody></table></div>
+<hr><strong>Registrar usuario</strong>
+<form id="usForm" class="row" style="margin-top:8px">
+  <label>Usuario<input id="uName" required></label>
+  <label>Contraseña (mín. 8)<input id="uPass" type="password" required minlength="8"></label>
+  <label>ID Telegram<input id="uTg" inputmode="numeric"></label>
+  <button class="pri">Crear</button>
+</form>
+<form method="dialog" style="margin-top:10px"><button>Cerrar</button></form></dialog>
+
+<script>
+const $=s=>document.querySelector(s);
+const eur=c=>(c/100).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtD=s=>`${s.slice(8,10)}/${s.slice(5,7)}/${s.slice(0,4)} ${s.slice(11,16)}`;
+const dec=c=>(c/100).toFixed(2);
+const LABEL={date:'fecha',type_id:'tipo',account_id:'cuenta',description:'descripción',amount:'importe',related_id:'relación'};
+let me,types=[],accounts=[],rows=[],chart,pendingDel=null,timer;
+
+async function api(p,o={}){
+  const r=await fetch('/api'+p,{method:o.method||'GET',headers:{'Content-Type':'application/json'},body:o.body?JSON.stringify(o.body):undefined});
+  let d={};try{d=await r.json()}catch{}
+  if(r.status===401&&p!=='/login'){showLogin();throw new Error('Sesión no válida')}
+  if(!r.ok){const e=new Error(d.error||'Error');e.status=r.status;throw e}
+  return d;
+}
+const fail=e=>alert(e.message);
+const opts=(l,blank)=>(blank!==undefined?`<option value="">${blank}</option>`:'')+l.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+
+function showLogin(){$('#app').hidden=true;$('#login').hidden=false}
+async function boot(){
+  try{me=await api('/me')}catch{return showLogin()}
+  $('#login').hidden=true;$('#app').hidden=false;
+  $('#btnUsers').hidden=!me.is_admin;$('#who').textContent=me.username;
+  await loadMeta();loadMovements();loadChart();
+}
+$('#lb').onclick=async()=>{
+  $('#err').textContent='';
+  try{await api('/login',{method:'POST',body:{username:$('#lu').value,password:$('#lp').value}});$('#lp').value='';boot()}
+  catch(e){$('#err').textContent=e.message}
+};
+$('#lp').onkeydown=e=>{if(e.key==='Enter')$('#lb').click()};
+$('#bOut').onclick=async()=>{await api('/logout',{method:'POST'}).catch(()=>{});showLogin()};
+
+async function loadMeta(){
+  [types,accounts]=await Promise.all([api('/types'),api('/accounts')]);
+  const fv=$('#fType').value,fa=$('#fAcc').value;
+  $('#fType').innerHTML=opts(types);$('#fAcc').innerHTML=opts(accounts.filter(a=>a.active));
+  if(fv)$('#fType').value=fv;if(fa)$('#fAcc').value=fa;
+  const lt=$('#flType').value,la=$('#flAcc').value;
+  $('#flType').innerHTML=opts(types,'Todos');$('#flAcc').innerHTML=opts(accounts,'Todas');
+  $('#flType').value=lt;$('#flAcc').value=la;
+}
+
+/* ---- listado ---- */
+async function loadMovements(){
+  const q=new URLSearchParams();
+  [['from','#flFrom'],['to','#flTo'],['type','#flType'],['account','#flAcc'],['q','#flQ']].forEach(([k,s])=>{if($(s).value)q.set(k,$(s).value)});
+  try{const d=await api('/movements?'+q);rows=d.rows;
+    $('#info').textContent=d.filtered?`${rows.length} resultados`:'Últimos 50 movimientos';renderTable()}catch(e){}
+}
+function renderTable(){
+  $('#tbody').innerHTML=rows.map(r=>`<tr data-id="${r.id}"><td>${r.id}</td>
+  <td class="ed" data-f="date">${fmtD(r.date)}</td><td class="ed" data-f="type_id">${esc(r.type)}</td>
+  <td class="ed" data-f="account_id">${esc(r.account)}</td><td class="ed" data-f="description">${esc(r.description)||'—'}</td>
+  <td class="ed num ${r.amount<0?'neg':'pos'}" data-f="amount">${eur(r.amount)}</td>
+  <td class="ed" data-f="related_id">${r.related_id??'—'}</td><td><button data-del="${r.id}">🗑</button></td></tr>`).join('');
+}
+const tb=$('#tbody');
+tb.addEventListener('dblclick',e=>{const td=e.target.closest('td.ed');if(td)startEdit(td)});
+let lp;
+tb.addEventListener('touchstart',e=>{const td=e.target.closest('td.ed');if(td)lp=setTimeout(()=>startEdit(td),600)},{passive:true});
+['touchend','touchmove','touchcancel'].forEach(ev=>tb.addEventListener(ev,()=>clearTimeout(lp),{passive:true}));
+tb.addEventListener('contextmenu',e=>{if(e.target.closest('td.ed'))e.preventDefault()});
+tb.addEventListener('click',async e=>{
+  const id=e.target.dataset.del;if(!id)return;
+  if(!confirm(`¿Eliminar el movimiento #${id}? Esta acción no se puede deshacer.`))return;
+  try{await api('/movements/'+id,{method:'DELETE'});loadMovements();loadChart()}catch(e){fail(e)}
+});
+function startEdit(td){
+  if(td.querySelector('.editor'))return;
+  const r=rows.find(x=>x.id==td.parentNode.dataset.id),f=td.dataset.f;let el;
+  const orig=f==='amount'?dec(r.amount):f==='date'?r.date.slice(0,16):String(r[f]??'');
+  if(f==='type_id'||f==='account_id'){
+    el=document.createElement('select');
+    el.innerHTML=opts(f==='type_id'?types:accounts.filter(a=>a.active||a.id===r.account_id));el.value=r[f]??'';
+  }else{
+    el=document.createElement('input');el.value=orig;
+    if(f==='date')el.type='datetime-local';else if(f==='related_id')el.type='number';else if(f==='amount')el.inputMode='decimal';
+  }
+  el.className='editor';td.textContent='';td.appendChild(el);el.focus();
+  let done=false;
+  const finish=async save=>{
+    if(done)return;done=true;
+    if(save&&el.value!==orig&&confirm(`¿Confirmas el cambio de ${LABEL[f]}?`)){
+      try{await api('/movements/'+r.id,{method:'PATCH',body:{field:f,value:el.value}});loadChart()}catch(e){fail(e)}
+      return loadMovements();
+    }
+    renderTable();
+  };
+  el.addEventListener('keydown',e=>{if(e.key==='Enter')finish(true);if(e.key==='Escape')finish(false)});
+  el.addEventListener('blur',()=>finish(true));
+}
+['flFrom','flTo','flType','flAcc'].forEach(i=>$('#'+i).onchange=loadMovements);
+$('#flQ').oninput=()=>{clearTimeout(timer);timer=setTimeout(loadMovements,300)};
+$('#flClear').onclick=()=>{['#flFrom','#flTo','#flType','#flAcc','#flQ'].forEach(s=>$(s).value='');loadMovements()};
+
+$('#addForm').onsubmit=async e=>{
+  e.preventDefault();
+  try{await api('/movements',{method:'POST',body:{type_id:$('#fType').value,account_id:$('#fAcc').value,amount:$('#fAmt').value,description:$('#fDesc').value,related_id:$('#fRel').value,date:$('#fDate').value||undefined}});
+    ['#fAmt','#fDesc','#fRel','#fDate'].forEach(s=>$(s).value='');loadMovements();loadChart()}catch(e){fail(e)}
+};
+
+/* ---- gráfica ---- */
+async function loadChart(){
+  const d=await api('/evolution?joint='+($('#incJoint').checked?1:0)).catch(()=>[]);
+  if(chart)chart.destroy();
+  chart=new Chart($('#chart'),{type:'line',data:{labels:d.map(x=>x.month),datasets:[{label:'Dinero total',data:d.map(x=>x.total/100),tension:.25,fill:true,borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.15)'}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>eur(Math.round(c.raw*100))}}},scales:{y:{ticks:{callback:v=>v.toLocaleString('es-ES',{minimumFractionDigits:2})}}}}});
+}
+$('#incJoint').onchange=loadChart;
+
+/* ---- cuentas ---- */
+async function openAcc(){await loadMeta();renderAcc();$('#dAcc').showModal()}
+function renderAcc(){
+  $('#accBody').innerHTML=accounts.map(a=>`<tr><td>${esc(a.name)}</td><td>${a.joint?'Conjunta':'Individual'}</td>
+  <td><input type="checkbox" data-act="${a.id}" ${a.active?'checked':''}></td><td class="num">${eur(a.calculated)}</td>
+  <td class="num"><input class="real" data-real="${a.id}" value="${dec(a.real_balance)}" inputmode="decimal"></td>
+  <td class="num">${a.diff===0?'✔️':`<span class="neg">${eur(a.diff)}</span>`}</td></tr>`).join('');
+  const s=j=>accounts.filter(a=>a.joint===j).reduce((x,a)=>x+a.calculated,0);
+  $('#accTot').textContent=`Total individual: ${eur(s(0))} · Total en conjuntas: ${eur(s(1))}`;
+}
+$('#accBody').onchange=async e=>{
+  const t=e.target;
+  try{
+    if(t.dataset.act)await api('/accounts/'+t.dataset.act,{method:'PATCH',body:{active:t.checked}});
+    else if(t.dataset.real)await api('/accounts/'+t.dataset.real,{method:'PATCH',body:{real_balance:t.value}});
+  }catch(e){fail(e)}
+  await loadMeta();renderAcc();
+};
+$('#accForm').onsubmit=async e=>{
+  e.preventDefault();
+  try{await api('/accounts',{method:'POST',body:{name:$('#aName').value,joint:$('#aJoint').checked,balance:$('#aBal').value}});
+    $('#aName').value='';$('#aBal').value='0,00';$('#aJoint').checked=false;await loadMeta();renderAcc();loadChart()}catch(e){fail(e)}
+};
+$('#bAcc').onclick=openAcc;
+
+/* ---- gastos por tipo ---- */
+async function loadStats(){
+  const d=await api('/typestats?months='+$('#months').value);
+  $('#stHead').innerHTML='<tr><th>Tipo</th>'+d.labels.map(l=>`<th class="num">${l}</th>`).join('')+'<th class="num">Media mensual</th></tr>';
+  $('#stBody').innerHTML=d.rows.map(r=>`<tr><td>${esc(r.type)}</td>${r.values.map(v=>`<td class="num ${v<0?'neg':v>0?'pos':''}">${eur(v)}</td>`).join('')}<td class="num ${r.avg<0?'neg':r.avg>0?'pos':''}">${eur(r.avg)}</td></tr>`).join('');
+}
+$('#bStats').onclick=async()=>{$('#months').value='24';try{await loadStats();$('#dStats').showModal()}catch(e){fail(e)}};
+$('#months').onchange=loadStats;
+
+/* ---- tipos ---- */
+function renderTypes(){$('#tyBody').innerHTML=types.map(t=>`<tr><td>${esc(t.name)}</td><td style="text-align:right">${t.name==='Otros'?'<span class="mut">tipo por defecto</span>':`<button data-dt="${t.id}">Eliminar</button>`}</td></tr>`).join('')}
+$('#bTypes').onclick=async()=>{await loadMeta();renderTypes();$('#reassign').hidden=true;$('#dTypes').showModal()};
+$('#tyForm').onsubmit=async e=>{e.preventDefault();try{await api('/types',{method:'POST',body:{name:$('#tyName').value}});$('#tyName').value='';await loadMeta();renderTypes()}catch(e){fail(e)}};
+async function delType(id,re){
+  try{await api('/types/'+id+(re?'?reassign='+re:''),{method:'DELETE'});$('#reassign').hidden=true;pendingDel=null;await loadMeta();renderTypes();loadMovements();loadChart()}
+  catch(e){
+    if(e.status===409){pendingDel=id;$('#reMsg').textContent=e.message;$('#reSel').innerHTML=opts(types.filter(t=>t.id!=id));$('#reassign').hidden=false}
+    else fail(e)
+  }
+}
+$('#tyBody').onclick=e=>{const id=e.target.dataset.dt;if(!id)return;const t=types.find(x=>x.id==id);
+  if(confirm(`¿Seguro que quieres eliminar el tipo "${t.name}"?`))delType(id)};
+$('#reOk').onclick=()=>{if($('#reSel').value&&confirm('Se actualizarán todos los movimientos al tipo elegido y se eliminará el tipo. ¿Continuar?'))delType(pendingDel,$('#reSel').value)};
+$('#reNo').onclick=()=>{$('#reassign').hidden=true};
+
+/* ---- usuarios (admin) ---- */
+async function loadUsers(){
+  const u=await api('/users');
+  $('#usBody').innerHTML=u.map(x=>`<tr><td>${esc(x.username)}${x.is_admin?' 👑':''}</td>
+  <td><input data-tg="${x.id}" value="${x.telegram_id??''}" inputmode="numeric" style="width:140px"></td>
+  <td><button data-pw="${x.id}">Contraseña</button> ${x.is_admin?'':`<button data-du="${x.id}">Eliminar</button>`}</td></tr>`).join('');
+}
+$('#btnUsers').onclick=async()=>{try{await loadUsers();$('#dUsers').showModal()}catch(e){fail(e)}};
+$('#usBody').onchange=async e=>{if(e.target.dataset.tg)try{await api('/users/'+e.target.dataset.tg,{method:'PATCH',body:{telegram_id:e.target.value.trim()}})}catch(x){fail(x);loadUsers()}};
+$('#usBody').onclick=async e=>{
+  const d=e.target.dataset;
+  try{
+    if(d.pw){const p=prompt('Nueva contraseña (mínimo 8 caracteres):');if(p)await api('/users/'+d.pw,{method:'PATCH',body:{password:p}})}
+    if(d.du&&confirm('¿Eliminar el usuario y TODOS sus datos?')){await api('/users/'+d.du,{method:'DELETE'});loadUsers()}
+  }catch(x){fail(x)}
+};
+$('#usForm').onsubmit=async e=>{e.preventDefault();
+  try{await api('/users',{method:'POST',body:{username:$('#uName').value,password:$('#uPass').value,telegram_id:$('#uTg').value.trim()}});
+    ['#uName','#uPass','#uTg'].forEach(s=>$(s).value='');loadUsers()}catch(x){fail(x)}};
+
+$('#bHelp').onclick=()=>$('#dHelp').showModal();
+boot();
+</script>
+</body>
+</html>
