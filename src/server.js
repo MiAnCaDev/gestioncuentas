@@ -101,6 +101,13 @@ app.delete('/api/movements/:id', auth, (req, res) => send(res, core.deleteMoveme
 app.get('/api/evolution', auth, (req, res) => res.json(core.evolution(req.user.id, req.query.joint === '1')));
 app.get('/api/typestats', auth, (req, res) => res.json(core.typeStats(req.user.id, Number(req.query.months ?? 24))));
 
+app.get('/api/export.csv', auth, (req, res) => {
+  const { csv } = core.exportCsv(req.user.id);
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="gastos_${core.fmtDate(new Date()).slice(0, 10)}.csv"`);
+  res.send(csv);
+});
+
 /* --- usuarios (solo admin) --- */
 app.get('/api/users', auth, admin, (req, res) =>
   res.json(db.prepare('SELECT id,username,telegram_id,is_admin FROM users ORDER BY username').all()));

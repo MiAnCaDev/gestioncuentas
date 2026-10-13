@@ -72,6 +72,7 @@ dialog h2{margin:0 0 10px;font-size:17px}
     <button id="bMenu" aria-haspopup="true" aria-expanded="false" title="Menú de usuario">☰ <span id="uname"></span></button>
     <div id="menu" class="menu" hidden>
       <button id="mProfile">👤 Perfil</button>
+      <a href="/api/export.csv" download>📥 Descargar CSV</a>
       <a href="https://t.me/gestioncuentas_bot" target="_blank" rel="noopener noreferrer">🤖 Bot de Telegram</a>
       <button id="bHelp">❓ Ayuda</button>
       <button id="bOut">🚪 Salir</button>
@@ -129,9 +130,10 @@ dialog h2{margin:0 0 10px;font-size:17px}
 <li><b>Gastos por tipo</b>: neto de los últimos 4 meses y media mensual del periodo elegido.</li>
 <li><b>Tipos</b>: crea o elimina tipos. Si un tipo tiene movimientos, deberás moverlos a otro tipo antes de borrarlo.</li>
 <li>Las cuentas conjuntas no cuentan en tu dinero total personal.</li>
+<li><b>Descargar CSV</b> (menú de tu usuario ☰): descarga todos tus gastos/ingresos, del más antiguo al más nuevo.</li>
 <li><b>Perfil</b> (menú de tu usuario ☰): consulta tus datos y cambia tu contraseña. El ID de Telegram solo lo puede modificar el administrador.</li>
 </ul>
-<p><b>Bot de Telegram</b> (<a href="https://t.me/gestioncuentas_bot" target="_blank" rel="noopener noreferrer">t.me/gestioncuentas_bot</a>, solo usuarios registrados): /nuevo, /borrar, /ultimos, /saldos, /saldoreal, /activar, /desactivar, /nuevacuenta, /nuevotipo, /tipos, /web, /uso (enlace a esta web), /help. Recibes un informe diario a las 9:00 y uno mensual el día 1 a las 9:00.</p>
+<p><b>Bot de Telegram</b> (<a href="https://t.me/gestioncuentas_bot" target="_blank" rel="noopener noreferrer">t.me/gestioncuentas_bot</a>, solo usuarios registrados): /nuevo, /borrar, /ultimos, /saldos, /saldoreal, /activar, /desactivar, /nuevacuenta, /nuevotipo, /tipos, /web, /uso, /exportar (CSV) (enlace a esta web), /help. Recibes un informe diario a las 9:00 y uno mensual el día 1 a las 9:00.</p>
 </div>
 <form method="dialog"><button>Cerrar</button></form></dialog>
 

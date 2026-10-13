@@ -27,7 +27,10 @@ const HELP = `🤖 Bot de control de gastos
 /saldos – saldo calculado de todas tus cuentas (! = no coincide con el saldo real)
 /saldoreal – indicar el saldo real de una cuenta y ver la discrepancia
 
-📅 Informes automáticos: diario a las 9:00 y mensual el día 1 a las 9:00.`;
+📥 EXPORTAR
+/exportar – descargar tus gastos/ingresos en un fichero CSV
+
+📅 Informes automáticos: recibirás por aquí un informe diario y otro mensual (resumen del mes anterior).`;
 
 const USO = `📖 Cómo empezar
 
@@ -78,7 +81,7 @@ module.exports = function startBot(core) {
   bot.command('nuevo', ctx => {
     const types = core.listTypes(ctx.user.id);
     const accs = core.accountsWithBalance(ctx.user.id).filter(a => a.active);
-    if (!types.length || !accs.length) return ctx.reply('Necesitas al menos un tipo y una cuenta activa (créalos en la web o con /nuevotipo).');
+    if (!types.length || !accs.length) return ctx.reply('Necesitas al menos un tipo y una cuenta activa (créalos con /nuevotipo y /nuevacuenta).');
     state.set(ctx.from.id, { step: 'type' });
     ctx.reply('Elige el tipo:', Markup.inlineKeyboard(chunk(types.map(t => Markup.button.callback(t.name, 'nt:' + t.id)), 2)));
   });
@@ -167,6 +170,15 @@ module.exports = function startBot(core) {
     ctx.reply(r.error ? '❌ ' + r.error : ctx.match[1] === 'on' ? '✅ Cuenta activada.' : '✅ Cuenta desactivada.');
   });
 
+  /* ---- exportar CSV ---- */
+  bot.command('exportar', ctx => {
+    const { csv, count } = core.exportCsv(ctx.user.id);
+    if (!count) return ctx.reply('No hay movimientos que exportar.');
+    return ctx.replyWithDocument(
+      { source: Buffer.from(csv, 'utf8'), filename: `gastos_${core.fmtDate(new Date()).slice(0, 10)}.csv` },
+      { caption: `📥 ${count} movimientos, de más antiguo a más nuevo.` });
+  });
+
   /* ---- nueva cuenta ---- */
   bot.command('nuevacuenta', ctx => {
     const name = ctx.message.text.split(/\s+/).slice(1).join(' ');
@@ -248,8 +260,18 @@ module.exports = function startBot(core) {
   const tz = process.env.TZ || 'Europe/Madrid';
   const broadcast = fn => core.telegramUsers().forEach(u =>
     bot.telegram.sendMessage(u.telegram_id, fn(u.id)).catch(e => console.error('Envío fallido a', u.username, e.message)));
-  cron.schedule('0 9 * * *', () => broadcast(core.dailyReport), { timezone: tz });
-  cron.schedule('0 9 1 * *', () => broadcast(core.monthlyReport), { timezone: tz });
+  // Horarios configurables por variables de entorno (formato cron de 5 campos); por defecto 9:00.
+  const schedule = (name, def) => {
+    const v = (process.env[name] || def).trim();
+    if (cron.validate(v)) return v;
+    console.error(`${name} no es una expresión cron válida ("${v}"); se usa "${def}".`);
+    return def;
+  };
+  const dailyCron = schedule('DAILY_REPORT_CRON', '0 9 * * *');
+  const monthlyCron = schedule('MONTHLY_REPORT_CRON', '0 9 1 * *');
+  cron.schedule(dailyCron, () => broadcast(core.dailyReport), { timezone: tz });
+  cron.schedule(monthlyCron, () => broadcast(core.monthlyReport), { timezone: tz });
+  console.log(`Informes programados (${tz}): diario "${dailyCron}", mensual "${monthlyCron}"`);
 
   bot.telegram.setMyCommands([
     { command: 'cancelar', description: 'Cancelar la operación en curso' },
@@ -265,7 +287,8 @@ module.exports = function startBot(core) {
     { command: 'nuevotipo', description: 'Crear tipo' },
     { command: 'tipos', description: 'Ver tipos' },
     { command: 'saldos', description: 'Saldos de las cuentas' },
-    { command: 'saldoreal', description: 'Indicar saldo real de una cuenta' }
+    { command: 'saldoreal', description: 'Indicar saldo real de una cuenta' },
+    { command: 'exportar', description: 'Descargar gastos/ingresos en CSV' }
   ]).catch(() => {});
 
   bot.launch().catch(e => console.error('No se pudo iniciar el bot:', e.message));

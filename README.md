@@ -4,7 +4,7 @@ Un único contenedor Docker con:
 
 - **Web** (Express) para registrar gastos/ingresos, gestionar cuentas y tipos, ver gráficas y estadísticas.
 - **Bot de Telegram** (Telegraf) para hacer lo mismo desde el móvil.
-- **Informes automáticos** por Telegram: diario (9:00) y mensual (día 1 a las 9:00).
+- **Informes automáticos** por Telegram: diario (9:00) y mensual (día 1 a las 9:00), con horario configurable.
 - **Base de datos SQLite** en un único fichero (`./data/gastos.db`), sin necesidad de MySQL.
 
 ## Puesta en marcha
@@ -20,7 +20,8 @@ Un único contenedor Docker con:
    | `ADMIN_USER` / `ADMIN_PASSWORD` | Administrador inicial (solo se crea si la BD está vacía; la contraseña debe cumplir la política de contraseñas, ver más abajo). |
    | `ADMIN_TELEGRAM_ID` | (Opcional) tu ID de Telegram, para usar el bot desde el primer momento. |
    | `TELEGRAM_BOT_TOKEN` | Token de BotFather. Vacío = el bot no arranca (la web sí). |
-   | `TZ` | Zona horaria (fechas por defecto e informes de las 9:00). Por defecto `Europe/Madrid`. |
+   | `DAILY_REPORT_CRON` / `MONTHLY_REPORT_CRON` | Cuándo se envían los informes (ver «Informes programados»). Por defecto `0 9 * * *` y `0 9 1 * *`. |
+   | `TZ` | Zona horaria (fechas por defecto e informes programados). Por defecto `Europe/Madrid`. |
    | `COOKIE_SECURE` | `true` (se accede por HTTPS a través de Cloudflare). |
    | `WEB_URL` / `BOT_URL` | Enlaces que muestra el bot (`/web`). Por defecto `https://gestioncuentas.mianca.com.es` y `https://t.me/gestioncuentas_bot`. |
 3. Arranca:
@@ -80,9 +81,63 @@ Ejemplo de **relación**: pagas una cena de 200 € en efectivo (id 57) y tres a
 | | `/tipos` | Listar tipos. |
 | 📊 Saldos | `/saldos` | Saldo calculado de cada cuenta (`!` si no coincide con el real). |
 | | `/saldoreal` | Indicar el saldo real de una cuenta y ver la discrepancia. |
+| 📥 Exportar | `/exportar` | Recibir un CSV con todos tus gastos/ingresos. |
 
-**Informe diario (9:00):** total personal, total en conjuntas y saldo de cada cuenta activa (con `!` si hay discrepancia).
-**Informe mensual (día 1, 9:00):** variación y total actual (sin conjuntas), variación y total en conjuntas, y neto del mes anterior por tipo y por cuenta.
+**Informe diario (9:00 por defecto):** total personal, total en conjuntas y saldo de cada cuenta activa (con `!` si hay discrepancia).
+**Informe mensual (día 1, 9:00 por defecto):** variación y total actual (sin conjuntas), variación y total en conjuntas, y neto del mes anterior por tipo y por cuenta.
+
+## Informes programados (horario y día de ejecución)
+
+El propio contenedor envía por Telegram dos informes a cada usuario que tenga un ID de Telegram registrado:
+
+| Informe | Variable | Valor por defecto | Significado |
+|---|---|---|---|
+| Diario | `DAILY_REPORT_CRON` | `0 9 * * *` | todos los días a las 9:00 |
+| Mensual | `MONTHLY_REPORT_CRON` | `0 9 1 * *` | el día 1 de cada mes a las 9:00 (resumen del mes anterior) |
+
+Los valores usan el formato **cron de 5 campos**:
+
+```
+┌───────── minuto (0-59)
+│ ┌─────── hora (0-23)
+│ │ ┌───── día del mes (1-31)
+│ │ │ ┌─── mes (1-12)
+│ │ │ │ ┌─ día de la semana (0-7; 0 y 7 = domingo)
+│ │ │ │ │
+0 9 * * *
+```
+
+Ejemplos:
+
+| Quiero… | Valor |
+|---|---|
+| Informe diario a las 8:30 | `DAILY_REPORT_CRON=30 8 * * *` |
+| Informe diario a las 21:00 | `DAILY_REPORT_CRON=0 21 * * *` |
+| Informe diario solo de lunes a viernes | `DAILY_REPORT_CRON=0 9 * * 1-5` |
+| Informe mensual el día 5 a las 10:00 | `MONTHLY_REPORT_CRON=0 10 5 * *` |
+| Informe mensual el día 1 a las 7:30 | `MONTHLY_REPORT_CRON=30 7 1 * *` |
+
+Cómo cambiarlo:
+1. Edita `.env` y modifica (o añade) las variables.
+2. Aplica el cambio recreando el contenedor: `docker compose up -d` (un simple `docker compose restart` **no** relee el `.env`).
+3. Comprueba en `docker compose logs` la línea `Informes programados (Europe/Madrid): diario "...", mensual "..."`.
+
+Notas:
+- La hora se interpreta en la zona horaria `TZ` del `.env`.
+- El informe mensual siempre resume el **mes natural anterior** a la fecha de envío, tengas el día que tengas configurado.
+- Si la expresión no es válida, se registra un error en los logs y se usa el valor por defecto.
+- Si el contenedor está parado a la hora programada, ese informe no se envía (no hay recuperación posterior).
+- Para probar, pon temporalmente `DAILY_REPORT_CRON=* * * * *` (se envía cada minuto), comprueba que te llega y vuelve a dejar el valor normal.
+- Solo reciben informes los usuarios con ID de Telegram asignado y solo si `TELEGRAM_BOT_TOKEN` está configurado.
+- Si prefieres fijarlo en el código, está en `src/bot.js` (valores por defecto de `schedule(...)`); después reconstruye con `docker compose up -d --build`.
+
+## Informes: cuentas conjuntas
+Si el usuario no tiene ninguna cuenta conjunta, los informes (diario y mensual) no distinguen entre personal y conjunto: no aparece ninguna línea de cuentas conjuntas y el total se muestra simplemente como «Total».
+
+## Exportar a CSV
+- **Web:** menú del usuario (☰) → *📥 Descargar CSV*, justo debajo de *Perfil*. **Bot:** `/exportar`.
+- Contiene solo los gastos/ingresos (incluidas las «situación inicial»), ordenados del más antiguo al más nuevo, con las columnas `ID;Tipo;Cuenta;Fecha;Importe;Relacion`.
+- Formato: separador `;`, importes con coma decimal y dos decimales, fecha `AAAA-MM-DD HH:MM:SS`, codificación UTF-8 con BOM (se abre correctamente en Excel en español).
 
 ## Copias de seguridad y mantenimiento
 

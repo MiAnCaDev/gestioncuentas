@@ -339,14 +339,32 @@ function typeStats(uid, months = 24) {
   return { labels, rows, periodMonths: n };
 }
 
+/* ---------- exportación CSV ---------- */
+// Solo movimientos, de más antiguo a más nuevo. Separador ";", decimales con coma, UTF-8 con BOM (abre bien en Excel).
+function exportCsv(uid) {
+  const rows = db.prepare(`SELECT m.id, t.name AS type, a.name AS account, m.date, m.amount, m.related_id
+    FROM movements m JOIN types t ON t.id=m.type_id JOIN accounts a ON a.id=m.account_id
+    WHERE m.user_id=? ORDER BY m.date ASC, m.id ASC`).all(uid);
+  const q = v => {
+    let s = String(v ?? '');
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // evita inyección de fórmulas en Excel
+    return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const lines = ['ID;Tipo;Cuenta;Fecha;Importe;Relacion'].concat(rows.map(r =>
+    [r.id, q(r.type), q(r.account), r.date.replace('T', ' '), (r.amount / 100).toFixed(2).replace('.', ','), r.related_id ?? ''].join(';')));
+  return { count: rows.length, csv: '\uFEFF' + lines.join('\r\n') + '\r\n' };
+}
+
 /* ---------- informes de Telegram ---------- */
 function dailyReport(uid) {
   const accs = accountsWithBalance(uid);
   const sum = j => accs.filter(a => a.joint === j).reduce((s, a) => s + a.calculated, 0);
   const d = new Date();
   const active = accs.filter(a => a.active);
+  const hasJoint = accs.some(a => a.joint === 1); // si no hay cuentas conjuntas, no se hace ninguna distinción
   let t = `📊 Informe diario ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}\n\n` +
-    `💰 Total personal: ${eur(sum(0))}\n🤝 Total en cuentas conjuntas: ${eur(sum(1))}\n\nCuentas:\n`;
+    `💰 Total${hasJoint ? ' personal' : ''}: ${eur(sum(0))}\n` +
+    (hasJoint ? `🤝 Total en cuentas conjuntas: ${eur(sum(1))}\n` : '') + `\nCuentas:\n`;
   t += active.map(a => `• ${a.name}${a.joint ? ' (conjunta)' : ''}: ${eur(a.calculated)}${a.diff !== 0 ? ' !' : ''}`).join('\n') || '(sin cuentas activas)';
   if (active.some(a => a.diff !== 0)) t += '\n\n! = el saldo real indicado no coincide con el calculado';
   return t;
@@ -365,9 +383,11 @@ function monthlyReport(uid, ref = new Date()) {
   const byAcc = db.prepare(`SELECT a.name n, SUM(m.amount) s FROM movements m JOIN accounts a ON a.id=m.account_id
     WHERE m.user_id=? AND m.date>=? AND m.date<? AND m.initial=0 GROUP BY a.id ORDER BY s`).all(uid, S, E);
   const mes = s.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+  const hasJoint = accs.some(a => a.joint === 1);
+  const lbl = hasJoint ? ' (sin conjuntas)' : '';
   return `📅 Informe mensual: ${mes}\n\n` +
-    `💰 Variación (sin conjuntas): ${sg(delta(0))}\n💰 Total actual (sin conjuntas): ${eur(tot(0))}\n\n` +
-    `🤝 Variación cuentas conjuntas: ${sg(delta(1))}\n🤝 Total actual cuentas conjuntas: ${eur(tot(1))}\n\n` +
+    `💰 Variación${lbl}: ${sg(delta(0))}\n💰 Total actual${lbl}: ${eur(tot(0))}\n\n` +
+    (hasJoint ? `🤝 Variación cuentas conjuntas: ${sg(delta(1))}\n🤝 Total actual cuentas conjuntas: ${eur(tot(1))}\n\n` : '') +
     `Por tipo:\n${byType.map(r => `• ${r.n}: ${sg(r.s)}`).join('\n') || '(sin movimientos)'}\n\n` +
     `Por cuenta:\n${byAcc.map(r => `• ${r.n}: ${sg(r.s)}`).join('\n') || '(sin movimientos)'}`;
 }
@@ -378,5 +398,5 @@ module.exports = {
   listTypes, addType, deleteType,
   accountsWithBalance, addAccount, setActive, setRealBalance,
   addMovement, editMovement, deleteMovement, listMovements,
-  evolution, typeStats, dailyReport, monthlyReport
+  evolution, typeStats, exportCsv, dailyReport, monthlyReport
 };
