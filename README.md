@@ -38,6 +38,7 @@ Un único contenedor Docker con:
 - Solo el **administrador** puede registrar usuarios (botón *Usuarios* en la web): usuario, contraseña e **ID de Telegram**.
 - Si alguien no registrado escribe al bot, recibe un mensaje de "sin permisos" que le indica que puede solicitar el registro y más información en el bot **@TwiBlog_bot** con el comando `/contacto`, e incluye su ID de Telegram para que puedas registrarlo. En la web, solo pueden entrar usuarios registrados.
 - **Política de contraseñas:** entre 8 y 64 caracteres, con al menos una mayúscula, una minúscula y un número. Se admiten símbolos habituales, pero no espacios ni caracteres raros (solo ASCII imprimible). Se aplica al crear usuarios, al cambiar contraseñas y al restablecerlas; las contraseñas ya existentes siguen siendo válidas.
+- **Informes:** en *Perfil* cada usuario puede activar o desactivar por separado el informe diario y el mensual (por defecto ambos activados).
 - **Perfil:** desde el menú del usuario (☰ con su nombre, arriba a la derecha) cada usuario ve su usuario y su ID de Telegram y puede cambiar su contraseña (pide la actual y la nueva dos veces; al cambiarla se cierran sus otras sesiones). El ID de Telegram solo lo cambia el administrador.
 - Cada usuario ve únicamente sus propios datos (movimientos, cuentas, tipos). Los nuevos usuarios reciben unos tipos por defecto (Comida, Transporte, Diversión, Mercancía, Otros). **«Otros» es el tipo por defecto de todos los usuarios y no se puede eliminar** (se usa para la «situación inicial» de las cuentas).
 
@@ -129,6 +130,7 @@ Notas:
 - Si el contenedor está parado a la hora programada, ese informe no se envía (no hay recuperación posterior).
 - Para probar, pon temporalmente `DAILY_REPORT_CRON=* * * * *` (se envía cada minuto), comprueba que te llega y vuelve a dejar el valor normal.
 - Solo reciben informes los usuarios con ID de Telegram asignado y solo si `TELEGRAM_BOT_TOKEN` está configurado.
+- Cada usuario puede desactivar el informe diario y/o el mensual desde su *Perfil* en la web (menú ☰ → Perfil → «Informes por Telegram»). Por defecto están activados.
 - Si prefieres fijarlo en el código, está en `src/bot.js` (valores por defecto de `schedule(...)`); después reconstruye con `docker compose up -d --build`.
 
 ## Informes: cuentas conjuntas

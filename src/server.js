@@ -70,7 +70,11 @@ app.post('/api/logout', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/me', auth, (req, res) => res.json({ username: req.user.username, telegram_id: req.user.telegram_id, is_admin: !!req.user.is_admin }));
+app.get('/api/me', auth, (req, res) => res.json({
+  username: req.user.username, telegram_id: req.user.telegram_id, is_admin: !!req.user.is_admin,
+  daily_report: !!req.user.daily_report, monthly_report: !!req.user.monthly_report
+}));
+app.patch('/api/me/prefs', auth, (req, res) => send(res, core.setReportPrefs(req.user.id, req.body || {})));
 app.post('/api/me/password', auth, (req, res) => {
   const { current, password, confirm } = req.body || {};
   send(res, core.changeOwnPassword(req.user.id, req.token, current, password, confirm));

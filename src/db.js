@@ -55,6 +55,11 @@ CREATE TABLE IF NOT EXISTS sessions(
 );
 `);
 
+// Migración: preferencias de informes por usuario (los usuarios existentes mantienen los informes activados).
+const userCols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+if (!userCols.includes('daily_report')) db.exec('ALTER TABLE users ADD COLUMN daily_report INTEGER NOT NULL DEFAULT 1');
+if (!userCols.includes('monthly_report')) db.exec('ALTER TABLE users ADD COLUMN monthly_report INTEGER NOT NULL DEFAULT 1');
+
 /* ---------- utilidades ---------- */
 const pad = n => String(n).padStart(2, '0');
 const fmtDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -131,6 +136,14 @@ function changeOwnPassword(uid, token, current, pw, confirm) {
   db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(bcrypt.hashSync(pw, 10), uid);
   db.prepare('DELETE FROM sessions WHERE user_id=? AND token<>?').run(uid, token); // cierra el resto de sesiones
   return { ok: true };
+}
+
+function setReportPrefs(uid, { daily_report, monthly_report } = {}) {
+  for (const v of [daily_report, monthly_report]) if (v !== undefined && typeof v !== 'boolean') return { error: 'Valor inválido' };
+  if (daily_report !== undefined) db.prepare('UPDATE users SET daily_report=? WHERE id=?').run(daily_report ? 1 : 0, uid);
+  if (monthly_report !== undefined) db.prepare('UPDATE users SET monthly_report=? WHERE id=?').run(monthly_report ? 1 : 0, uid);
+  const u = db.prepare('SELECT daily_report, monthly_report FROM users WHERE id=?').get(uid);
+  return { ok: true, daily_report: !!u.daily_report, monthly_report: !!u.monthly_report };
 }
 
 const userByTelegram = tg => db.prepare('SELECT * FROM users WHERE telegram_id=?').get(tg);
@@ -394,7 +407,7 @@ function monthlyReport(uid, ref = new Date()) {
 
 module.exports = {
   db, eur, sg, toCents, fmtDate,
-  createUser, updateUser, changeOwnPassword, userByTelegram, telegramUsers,
+  createUser, updateUser, changeOwnPassword, setReportPrefs, userByTelegram, telegramUsers,
   listTypes, addType, deleteType,
   accountsWithBalance, addAccount, setActive, setRealBalance,
   addMovement, editMovement, deleteMovement, listMovements,

@@ -258,7 +258,7 @@ module.exports = function startBot(core) {
 
   /* ---- informes programados ---- */
   const tz = process.env.TZ || 'Europe/Madrid';
-  const broadcast = fn => core.telegramUsers().forEach(u =>
+  const broadcast = (fn, flag) => core.telegramUsers().filter(u => u[flag]).forEach(u =>
     bot.telegram.sendMessage(u.telegram_id, fn(u.id)).catch(e => console.error('Envío fallido a', u.username, e.message)));
   // Horarios configurables por variables de entorno (formato cron de 5 campos); por defecto 9:00.
   const schedule = (name, def) => {
@@ -269,8 +269,8 @@ module.exports = function startBot(core) {
   };
   const dailyCron = schedule('DAILY_REPORT_CRON', '0 9 * * *');
   const monthlyCron = schedule('MONTHLY_REPORT_CRON', '0 9 1 * *');
-  cron.schedule(dailyCron, () => broadcast(core.dailyReport), { timezone: tz });
-  cron.schedule(monthlyCron, () => broadcast(core.monthlyReport), { timezone: tz });
+  cron.schedule(dailyCron, () => broadcast(core.dailyReport, 'daily_report'), { timezone: tz });
+  cron.schedule(monthlyCron, () => broadcast(core.monthlyReport, 'monthly_report'), { timezone: tz });
   console.log(`Informes programados (${tz}): diario "${dailyCron}", mensual "${monthlyCron}"`);
 
   bot.telegram.setMyCommands([
