@@ -9,6 +9,7 @@ Comandos:
 /ultimos – ver los últimos 10 movimientos
 /saldos – saldo calculado de todas tus cuentas (! = no coincide con el saldo real)
 /saldoreal – indicar el saldo real de una cuenta y ver la discrepancia
+/nuevacuenta – crear una cuenta nueva
 /activar – activar una cuenta desactivada
 /desactivar – desactivar una cuenta
 /nuevotipo – crear un tipo nuevo
@@ -139,6 +140,27 @@ module.exports = function startBot(core) {
     ctx.reply(r.error ? '❌ ' + r.error : ctx.match[1] === 'on' ? '✅ Cuenta activada.' : '✅ Cuenta desactivada.');
   });
 
+  /* ---- nueva cuenta ---- */
+  bot.command('nuevacuenta', ctx => {
+    const name = ctx.message.text.split(/\s+/).slice(1).join(' ');
+    if (name) return askJoint(ctx, name);
+    state.set(ctx.from.id, { step: 'accname' });
+    ctx.reply('Escribe el nombre de la nueva cuenta (ej: Santander, Efectivo):');
+  });
+  function askJoint(ctx, name) {
+    if (name.length > 40) return ctx.reply('El nombre es demasiado largo (máximo 40 caracteres). Inténtalo de nuevo:');
+    state.set(ctx.from.id, { step: 'accjoint', name });
+    return ctx.reply(`Cuenta "${name}". ¿Es individual o conjunta (compartida con otras personas)?`,
+      Markup.inlineKeyboard([[Markup.button.callback('Individual', 'aj:0'), Markup.button.callback('Conjunta', 'aj:1')]]));
+  }
+  bot.action(/^aj:([01])$/, async ctx => {
+    await ctx.answerCbQuery(); clear(ctx);
+    const s = state.get(ctx.from.id);
+    if (!s || s.step !== 'accjoint') return ctx.reply('Selección caducada. Usa /nuevacuenta.');
+    s.joint = ctx.match[1] === '1'; s.step = 'accbal';
+    ctx.reply('¿Qué saldo tiene actualmente? (puede ser 0, ej: 1234,56)');
+  });
+
   /* ---- nuevo tipo ---- */
   bot.command('nuevotipo', ctx => {
     const name = ctx.message.text.split(/\s+/).slice(1).join(' ');
@@ -172,6 +194,19 @@ module.exports = function startBot(core) {
         ? `✅ En ${r.name} coinciden el saldo calculado y el real (${core.eur(r.calculated)}).`
         : `⚠️ Discrepancia en ${r.name}\nCalculado: ${core.eur(r.calculated)}\nReal: ${core.eur(r.real)}\nDiferencia (real − calculado): ${core.sg(r.diff)}`);
     }
+    if (s.step === 'accname') {
+      if (!t) return ctx.reply('Escribe un nombre válido:');
+      return askJoint(ctx, t);
+    }
+    if (s.step === 'accbal') {
+      const c = core.toCents(t);
+      if (c === null) return ctx.reply('Importe no válido. Ejemplos: 0 o 1234,56');
+      state.delete(ctx.from.id);
+      const r = core.addAccount(ctx.user.id, s.name, s.joint, t);
+      return ctx.reply(r.error ? '❌ ' + r.error
+        : `✅ Cuenta "${s.name}" creada (${s.joint ? 'conjunta' : 'individual'}) con saldo ${core.eur(c)}.` +
+          (c !== 0 ? '\nSe ha registrado un movimiento "situación inicial" en el tipo Otros.' : ''));
+    }
     if (s.step === 'newtype') {
       state.delete(ctx.from.id);
       const r = core.addType(ctx.user.id, t);
@@ -195,6 +230,7 @@ module.exports = function startBot(core) {
     { command: 'ultimos', description: 'Últimos movimientos' },
     { command: 'saldos', description: 'Saldos de las cuentas' },
     { command: 'saldoreal', description: 'Indicar saldo real de una cuenta' },
+    { command: 'nuevacuenta', description: 'Crear cuenta' },
     { command: 'activar', description: 'Activar cuenta' },
     { command: 'desactivar', description: 'Desactivar cuenta' },
     { command: 'nuevotipo', description: 'Crear tipo' },

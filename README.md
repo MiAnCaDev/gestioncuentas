@@ -70,6 +70,7 @@ Ejemplo de **relación**: pagas una cena de 200 € en efectivo (id 57) y tres a
 | `/ultimos` | Últimos 10 movimientos. |
 | `/saldos` | Saldo calculado de cada cuenta (`!` si no coincide con el real). |
 | `/saldoreal` | Indicar el saldo real de una cuenta y ver la discrepancia. |
+| `/nuevacuenta [nombre]` | Crear una cuenta: nombre → individual/conjunta → saldo actual (puede ser 0). Si el saldo no es 0 se registra la «situación inicial». |
 | `/activar`, `/desactivar` | Activar/desactivar cuentas. |
 | `/nuevotipo [nombre]` | Crear un tipo. |
 | `/tipos` | Listar tipos. |
