@@ -3,22 +3,48 @@ const cron = require('node-cron');
 
 const HELP = `🤖 Bot de control de gastos
 
-Comandos:
-/nuevo – añadir gasto/ingreso (negativo = gasto, positivo = ingreso)
-/borrar – borrar un movimiento (doble confirmación)
-/ultimos – ver los últimos 10 movimientos
-/saldos – saldo calculado de todas tus cuentas (! = no coincide con el saldo real)
-/saldoreal – indicar el saldo real de una cuenta y ver la discrepancia
-/nuevacuenta – crear una cuenta nueva
-/activar – activar una cuenta desactivada
-/desactivar – desactivar una cuenta
-/nuevotipo – crear un tipo nuevo
-/tipos – ver tus tipos
+⚙️ GENERALES
 /cancelar – cancelar la operación en curso
 /web – enlace a la web
 /help – esta ayuda
+/uso – guía de primeros pasos
 
-Informes automáticos: diario a las 9:00 y mensual el día 1 a las 9:00.`;
+💸 GASTOS E INGRESOS
+/nuevo – añadir gasto/ingreso (negativo = gasto, positivo = ingreso)
+/borrar – borrar un movimiento (doble confirmación)
+/ultimos – ver los últimos 10 movimientos
+
+🏦 CUENTAS
+/nuevacuenta – crear una cuenta nueva
+/activar – activar una cuenta desactivada
+/desactivar – desactivar una cuenta
+
+🏷️ TIPOS
+/nuevotipo – crear un tipo nuevo
+/tipos – ver tus tipos
+
+📊 SALDOS
+/saldos – saldo calculado de todas tus cuentas (! = no coincide con el saldo real)
+/saldoreal – indicar el saldo real de una cuenta y ver la discrepancia
+
+📅 Informes automáticos: diario a las 9:00 y mensual el día 1 a las 9:00.`;
+
+const USO = `📖 Cómo empezar
+
+Cuando empieces a usar el sistema, sigue estos pasos:
+
+1️⃣ Crea una cuenta donde asociarás tus gastos e ingresos (ej.: Santander, BBVA, Efectivo).
+   👉 /nuevacuenta
+
+2️⃣ Crea distintos tipos para categorizar esos gastos (ej.: Sueldo, Comida, Restaurante, Mercancía, Transporte, Diversión...). Ya tienes algunos por defecto; puedes verlos con /tipos.
+   👉 /nuevotipo
+
+3️⃣ Añade los gastos e ingresos que desees: el importe es negativo para un gasto y positivo para un ingreso.
+   👉 /nuevo
+
+💡 Para comprobar que todo cuadra, indica de vez en cuando el saldo real de tus cuentas con /saldoreal; el bot te avisará si hay discrepancias con lo calculado.
+
+🌐 Todo esto se puede hacer tanto desde Telegram como desde la web (/web).`;
 
 const WEB_URL = process.env.WEB_URL || 'https://gestioncuentas.mianca.com.es';
 const chunk = (a, n) => a.reduce((r, x, i) => (i % n ? r[r.length - 1].push(x) : r.push([x]), r), []);
@@ -44,6 +70,7 @@ module.exports = function startBot(core) {
   });
 
   bot.command(['start', 'help'], ctx => ctx.reply(HELP));
+  bot.command('uso', ctx => ctx.reply(USO));
   bot.command('web', ctx => ctx.reply('🌐 Acceso a la web:', Markup.inlineKeyboard([[Markup.button.url('Abrir ' + WEB_URL.replace(/^https?:\/\//, ''), WEB_URL)]])));
   bot.command('cancelar', ctx => { state.delete(ctx.from.id); ctx.reply('Operación cancelada.'); });
 
@@ -225,18 +252,20 @@ module.exports = function startBot(core) {
   cron.schedule('0 9 1 * *', () => broadcast(core.monthlyReport), { timezone: tz });
 
   bot.telegram.setMyCommands([
+    { command: 'cancelar', description: 'Cancelar la operación en curso' },
+    { command: 'web', description: 'Enlace a la web' },
+    { command: 'help', description: 'Ayuda' },
+    { command: 'uso', description: 'Guía de primeros pasos' },
     { command: 'nuevo', description: 'Añadir gasto/ingreso' },
     { command: 'borrar', description: 'Borrar un movimiento' },
     { command: 'ultimos', description: 'Últimos movimientos' },
-    { command: 'saldos', description: 'Saldos de las cuentas' },
-    { command: 'saldoreal', description: 'Indicar saldo real de una cuenta' },
     { command: 'nuevacuenta', description: 'Crear cuenta' },
     { command: 'activar', description: 'Activar cuenta' },
     { command: 'desactivar', description: 'Desactivar cuenta' },
     { command: 'nuevotipo', description: 'Crear tipo' },
     { command: 'tipos', description: 'Ver tipos' },
-    { command: 'web', description: 'Enlace a la web' },
-    { command: 'help', description: 'Ayuda' }
+    { command: 'saldos', description: 'Saldos de las cuentas' },
+    { command: 'saldoreal', description: 'Indicar saldo real de una cuenta' }
   ]).catch(() => {});
 
   bot.launch().catch(e => console.error('No se pudo iniciar el bot:', e.message));

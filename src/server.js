@@ -25,7 +25,9 @@ app.use((req, res, next) => {
   if (req.path.startsWith('/api')) res.setHeader('Cache-Control', 'no-store');
   next();
 });
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  setHeaders: (res, f) => { if (f.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache'); } // evita ver una versión antigua de la web
+}));
 
 const send = (res, r) => r.error ? res.status(r.status || 400).json({ error: r.error, count: r.count }) : res.json(r);
 const SESSION_MS = 30 * 86400e3;
@@ -68,7 +70,11 @@ app.post('/api/logout', auth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/me', auth, (req, res) => res.json({ username: req.user.username, is_admin: !!req.user.is_admin }));
+app.get('/api/me', auth, (req, res) => res.json({ username: req.user.username, telegram_id: req.user.telegram_id, is_admin: !!req.user.is_admin }));
+app.post('/api/me/password', auth, (req, res) => {
+  const { current, password, confirm } = req.body || {};
+  send(res, core.changeOwnPassword(req.user.id, req.token, current, password, confirm));
+});
 
 /* --- tipos --- */
 app.get('/api/types', auth, (req, res) => res.json(core.listTypes(req.user.id)));

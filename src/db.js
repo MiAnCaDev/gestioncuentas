@@ -70,13 +70,21 @@ const sg = c => (c > 0 ? '+' : '') + eur(c);
 const owned = (table, uid, id) => db.prepare(`SELECT * FROM ${table} WHERE id=? AND user_id=?`).get(id, uid);
 
 /* ---------- usuarios ---------- */
+const PW_RULES = 'La contraseña debe tener entre 8 y 64 caracteres, con al menos una mayúscula, una minúscula y un número. Se admiten símbolos habituales (! @ # $ % & * ...), pero no espacios ni caracteres especiales raros.';
+function checkPassword(pw) {
+  pw = String(pw ?? '');
+  const ok = pw.length >= 8 && pw.length <= 64 && /[a-z]/.test(pw) && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /^[\x21-\x7E]+$/.test(pw);
+  return ok ? null : PW_RULES;
+}
+
 const DEFAULT_TYPES = ['Comida', 'Transporte', 'Diversión', 'Mercancía', 'Otros'];
 const DEFAULT_TYPE = 'Otros'; // tipo por defecto: no se puede eliminar
 
 function createUser(username, password, telegramId, isAdmin = 0) {
   username = String(username || '').trim();
   if (!/^[\w.-]{3,32}$/.test(username)) return { error: 'Usuario inválido (3-32 caracteres: letras, números, . _ -)' };
-  if (String(password || '').length < 8) return { error: 'La contraseña debe tener al menos 8 caracteres' };
+  const pe = checkPassword(password);
+  if (pe) return { error: pe };
   const tg = telegramId === '' || telegramId == null ? null : Number(telegramId);
   if (tg !== null && !Number.isInteger(tg)) return { error: 'ID de Telegram inválido' };
   try {
@@ -101,7 +109,8 @@ function updateUser(id, { telegram_id, password }) {
       db.prepare('UPDATE users SET telegram_id=? WHERE id=?').run(tg, id);
     }
     if (password !== undefined) {
-      if (String(password).length < 8) return { error: 'La contraseña debe tener al menos 8 caracteres' };
+      const pe = checkPassword(password);
+      if (pe) return { error: pe };
       db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(bcrypt.hashSync(password, 10), id);
       db.prepare('DELETE FROM sessions WHERE user_id=?').run(id);
     }
@@ -109,6 +118,19 @@ function updateUser(id, { telegram_id, password }) {
   } catch (e) {
     return { error: /UNIQUE/.test(e.message) ? 'Ese ID de Telegram ya está asignado a otro usuario' : e.message };
   }
+}
+
+// Cambio de contraseña por el propio usuario (no puede tocar su ID de Telegram).
+function changeOwnPassword(uid, token, current, pw, confirm) {
+  const u = db.prepare('SELECT * FROM users WHERE id=?').get(uid);
+  if (!bcrypt.compareSync(String(current || ''), u.password_hash)) return { error: 'La contraseña actual no es correcta' };
+  if (pw !== confirm) return { error: 'Las contraseñas nuevas no coinciden' };
+  const pe = checkPassword(pw);
+  if (pe) return { error: pe };
+  if (bcrypt.compareSync(pw, u.password_hash)) return { error: 'La nueva contraseña debe ser distinta de la actual' };
+  db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(bcrypt.hashSync(pw, 10), uid);
+  db.prepare('DELETE FROM sessions WHERE user_id=? AND token<>?').run(uid, token); // cierra el resto de sesiones
+  return { ok: true };
 }
 
 const userByTelegram = tg => db.prepare('SELECT * FROM users WHERE telegram_id=?').get(tg);
@@ -352,7 +374,7 @@ function monthlyReport(uid, ref = new Date()) {
 
 module.exports = {
   db, eur, sg, toCents, fmtDate,
-  createUser, updateUser, userByTelegram, telegramUsers,
+  createUser, updateUser, changeOwnPassword, userByTelegram, telegramUsers,
   listTypes, addType, deleteType,
   accountsWithBalance, addAccount, setActive, setRealBalance,
   addMovement, editMovement, deleteMovement, listMovements,

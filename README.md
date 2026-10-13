@@ -17,7 +17,7 @@ Un único contenedor Docker con:
    ```
    | Variable | Descripción |
    |---|---|
-   | `ADMIN_USER` / `ADMIN_PASSWORD` | Administrador inicial (solo se crea si la BD está vacía; contraseña ≥ 8 caracteres). |
+   | `ADMIN_USER` / `ADMIN_PASSWORD` | Administrador inicial (solo se crea si la BD está vacía; la contraseña debe cumplir la política de contraseñas, ver más abajo). |
    | `ADMIN_TELEGRAM_ID` | (Opcional) tu ID de Telegram, para usar el bot desde el primer momento. |
    | `TELEGRAM_BOT_TOKEN` | Token de BotFather. Vacío = el bot no arranca (la web sí). |
    | `TZ` | Zona horaria (fechas por defecto e informes de las 9:00). Por defecto `Europe/Madrid`. |
@@ -36,6 +36,8 @@ Un único contenedor Docker con:
 
 - Solo el **administrador** puede registrar usuarios (botón *Usuarios* en la web): usuario, contraseña e **ID de Telegram**.
 - Si alguien no registrado escribe al bot, recibe un mensaje de "sin permisos" que le indica que puede solicitar el registro y más información en el bot **@TwiBlog_bot** con el comando `/contacto`, e incluye su ID de Telegram para que puedas registrarlo. En la web, solo pueden entrar usuarios registrados.
+- **Política de contraseñas:** entre 8 y 64 caracteres, con al menos una mayúscula, una minúscula y un número. Se admiten símbolos habituales, pero no espacios ni caracteres raros (solo ASCII imprimible). Se aplica al crear usuarios, al cambiar contraseñas y al restablecerlas; las contraseñas ya existentes siguen siendo válidas.
+- **Perfil:** desde el menú del usuario (☰ con su nombre, arriba a la derecha) cada usuario ve su usuario y su ID de Telegram y puede cambiar su contraseña (pide la actual y la nueva dos veces; al cambiarla se cierran sus otras sesiones). El ID de Telegram solo lo cambia el administrador.
 - Cada usuario ve únicamente sus propios datos (movimientos, cuentas, tipos). Los nuevos usuarios reciben unos tipos por defecto (Comida, Transporte, Diversión, Mercancía, Otros). **«Otros» es el tipo por defecto de todos los usuarios y no se puede eliminar** (se usa para la «situación inicial» de las cuentas).
 
 ## Funcionamiento
@@ -60,23 +62,24 @@ Ejemplo de **relación**: pagas una cena de 200 € en efectivo (id 57) y tres a
 - Popup *Cuentas y saldos*: crear cuentas, activar/desactivar, saldo real vs. calculado.
 - Popup *Gastos por tipo*: neto de los últimos 4 meses + media mensual configurable (6 meses, 1–5 años o total). Por defecto 2 años. La media es el neto del periodo dividido entre el nº de meses.
 - Popup *Tipos*: crear y eliminar. Si el tipo tiene movimientos, se pide moverlos a otro tipo existente antes de borrar.
-- Icono ❓ con la ayuda y botón 🤖 con enlace al bot ([t.me/gestioncuentas_bot](https://t.me/gestioncuentas_bot)).
+- Menú de usuario (☰ con el nombre): **Perfil**, enlace al **bot** ([t.me/gestioncuentas_bot](https://t.me/gestioncuentas_bot)), **ayuda** (❓) y **salir**. El botón *Usuarios* sigue en la barra superior para el administrador.
 
 ### Bot
-| Comando | Acción |
-|---|---|
-| `/nuevo` | Añadir movimiento: tipo → cuenta → importe → descripción (fecha = ahora). |
-| `/borrar` | Elegir un movimiento y confirmar **dos veces**. |
-| `/ultimos` | Últimos 10 movimientos. |
-| `/saldos` | Saldo calculado de cada cuenta (`!` si no coincide con el real). |
-| `/saldoreal` | Indicar el saldo real de una cuenta y ver la discrepancia. |
-| `/nuevacuenta [nombre]` | Crear una cuenta: nombre → individual/conjunta → saldo actual (puede ser 0). Si el saldo no es 0 se registra la «situación inicial». |
-| `/activar`, `/desactivar` | Activar/desactivar cuentas. |
-| `/nuevotipo [nombre]` | Crear un tipo. |
-| `/tipos` | Listar tipos. |
-| `/cancelar` | Cancelar la operación en curso. |
-| `/web` | Enlace a la web. |
-| `/help` | Ayuda. |
+| Grupo | Comando | Acción |
+|---|---|---|
+| ⚙️ Generales | `/cancelar` | Cancelar la operación en curso. |
+| | `/web` | Enlace a la web. |
+| | `/help` | Ayuda con todos los comandos, agrupados. |
+| | `/uso` | Guía de primeros pasos: crear cuenta → crear tipos → añadir gastos. |
+| 💸 Gastos | `/nuevo` | Añadir movimiento: tipo → cuenta → importe → descripción (fecha = ahora). |
+| | `/borrar` | Elegir un movimiento y confirmar **dos veces**. |
+| | `/ultimos` | Últimos 10 movimientos. |
+| 🏦 Cuentas | `/nuevacuenta [nombre]` | Crear una cuenta: nombre → individual/conjunta → saldo actual (puede ser 0). Si el saldo no es 0 se registra la «situación inicial». |
+| | `/activar`, `/desactivar` | Activar/desactivar cuentas. |
+| 🏷️ Tipos | `/nuevotipo [nombre]` | Crear un tipo. |
+| | `/tipos` | Listar tipos. |
+| 📊 Saldos | `/saldos` | Saldo calculado de cada cuenta (`!` si no coincide con el real). |
+| | `/saldoreal` | Indicar el saldo real de una cuenta y ver la discrepancia. |
 
 **Informe diario (9:00):** total personal, total en conjuntas y saldo de cada cuenta activa (con `!` si hay discrepancia).
 **Informe mensual (día 1, 9:00):** variación y total actual (sin conjuntas), variación y total en conjuntas, y neto del mes anterior por tipo y por cuenta.

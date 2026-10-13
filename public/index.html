@@ -32,6 +32,20 @@ dialog h2{margin:0 0 10px;font-size:17px}
 #login{max-width:340px;margin:12vh auto;padding:16px}
 #login input{width:100%;margin-bottom:8px}#err{color:var(--neg);font-size:13px}
 .real{width:110px;text-align:right}
+.nav{display:flex;flex-wrap:wrap;gap:8px}
+.dd{position:relative}
+@media(max-width:700px){
+  header{position:static}
+  header h1{order:1;flex:1;margin:0}
+  .dd{order:2}
+  .nav{order:3;width:100%}
+}
+.menu{position:absolute;right:0;top:calc(100% + 6px);min-width:200px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:20;display:flex;flex-direction:column;gap:2px}
+.menu[hidden]{display:none}
+.menu button,.menu a{border:0;background:none;text-align:left;padding:8px 10px;border-radius:6px;color:inherit;text-decoration:none;cursor:pointer;font:inherit}
+.menu button:hover,.menu a:hover{background:rgba(127,127,127,.15)}
+.col label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:2px;margin-bottom:8px}
+.col input{width:100%}
 </style>
 </head>
 <body>
@@ -48,14 +62,21 @@ dialog h2{margin:0 0 10px;font-size:17px}
 <div id="app" hidden>
 <header>
   <h1>💶 Mis gastos</h1>
-  <button id="bAcc">Cuentas y saldos</button>
-  <button id="bStats">Gastos por tipo</button>
-  <button id="bTypes">Tipos</button>
-  <button id="btnUsers" hidden>Usuarios</button>
-  <a href="https://t.me/gestioncuentas_bot" target="_blank" rel="noopener noreferrer" title="Abrir el bot de Telegram"><button type="button">🤖 Bot</button></a>
-  <button id="bHelp" title="Ayuda">❓</button>
-  <span class="mut" id="who"></span>
-  <button id="bOut">Salir</button>
+  <nav class="nav">
+    <button id="bAcc">Cuentas y saldos</button>
+    <button id="bTypes">Tipos</button>
+    <button id="bStats">Gastos por tipo</button>
+    <button id="btnUsers" hidden>Usuarios</button>
+  </nav>
+  <div class="dd">
+    <button id="bMenu" aria-haspopup="true" aria-expanded="false" title="Menú de usuario">☰ <span id="uname"></span></button>
+    <div id="menu" class="menu" hidden>
+      <button id="mProfile">👤 Perfil</button>
+      <a href="https://t.me/gestioncuentas_bot" target="_blank" rel="noopener noreferrer">🤖 Bot de Telegram</a>
+      <button id="bHelp">❓ Ayuda</button>
+      <button id="bOut">🚪 Salir</button>
+    </div>
+  </div>
 </header>
 <main>
   <section class="card">
@@ -108,8 +129,9 @@ dialog h2{margin:0 0 10px;font-size:17px}
 <li><b>Gastos por tipo</b>: neto de los últimos 4 meses y media mensual del periodo elegido.</li>
 <li><b>Tipos</b>: crea o elimina tipos. Si un tipo tiene movimientos, deberás moverlos a otro tipo antes de borrarlo.</li>
 <li>Las cuentas conjuntas no cuentan en tu dinero total personal.</li>
+<li><b>Perfil</b> (menú de tu usuario ☰): consulta tus datos y cambia tu contraseña. El ID de Telegram solo lo puede modificar el administrador.</li>
 </ul>
-<p><b>Bot de Telegram</b> (<a href="https://t.me/gestioncuentas_bot" target="_blank" rel="noopener noreferrer">t.me/gestioncuentas_bot</a>, solo usuarios registrados): /nuevo, /borrar, /ultimos, /saldos, /saldoreal, /activar, /desactivar, /nuevacuenta, /nuevotipo, /tipos, /web (enlace a esta web), /help. Recibes un informe diario a las 9:00 y uno mensual el día 1 a las 9:00.</p>
+<p><b>Bot de Telegram</b> (<a href="https://t.me/gestioncuentas_bot" target="_blank" rel="noopener noreferrer">t.me/gestioncuentas_bot</a>, solo usuarios registrados): /nuevo, /borrar, /ultimos, /saldos, /saldoreal, /activar, /desactivar, /nuevacuenta, /nuevotipo, /tipos, /web, /uso (enlace a esta web), /help. Recibes un informe diario a las 9:00 y uno mensual el día 1 a las 9:00.</p>
 </div>
 <form method="dialog"><button>Cerrar</button></form></dialog>
 
@@ -139,12 +161,26 @@ dialog h2{margin:0 0 10px;font-size:17px}
 <form id="tyForm" class="row" style="margin-top:8px"><label>Nuevo tipo<input id="tyName" required maxlength="40"></label><button class="pri">Añadir</button></form>
 <form method="dialog" style="margin-top:10px"><button>Cerrar</button></form></dialog>
 
+<dialog id="dProf"><h2>Perfil</h2>
+<table><tr><th>Usuario</th><td id="pUser"></td></tr><tr><th>ID de Telegram</th><td id="pTg"></td></tr></table>
+<p class="mut">El ID de Telegram solo puede cambiarlo el administrador.</p>
+<p id="pwMsg"></p>
+<button id="pPwBtn">Cambiar contraseña</button>
+<form id="pwForm" class="col" hidden>
+  <label>Contraseña actual<input id="pwCur" type="password" autocomplete="current-password" required></label>
+  <label>Nueva contraseña<input id="pwNew" type="password" autocomplete="new-password" required></label>
+  <label>Repite la nueva contraseña<input id="pwNew2" type="password" autocomplete="new-password" required></label>
+  <p class="mut">Mínimo 8 caracteres, con al menos una mayúscula, una minúscula y un número. Puedes usar símbolos habituales (! @ # $ % &amp; * …), sin espacios.</p>
+  <button class="pri">Guardar contraseña</button> <button type="button" id="pwCancel">Cancelar</button>
+</form>
+<form method="dialog" style="margin-top:10px"><button>Cerrar</button></form></dialog>
+
 <dialog id="dUsers"><h2>Usuarios</h2>
 <div class="tw"><table><thead><tr><th>Usuario</th><th>ID Telegram</th><th></th></tr></thead><tbody id="usBody"></tbody></table></div>
 <hr><strong>Registrar usuario</strong>
 <form id="usForm" class="row" style="margin-top:8px">
   <label>Usuario<input id="uName" required></label>
-  <label>Contraseña (mín. 8)<input id="uPass" type="password" required minlength="8"></label>
+  <label>Contraseña (8+, mayús., minús. y nº)<input id="uPass" type="password" required minlength="8"></label>
   <label>ID Telegram<input id="uTg" inputmode="numeric"></label>
   <button class="pri">Crear</button>
 </form>
@@ -173,7 +209,7 @@ function showLogin(){$('#app').hidden=true;$('#login').hidden=false}
 async function boot(){
   try{me=await api('/me')}catch{return showLogin()}
   $('#login').hidden=true;$('#app').hidden=false;
-  $('#btnUsers').hidden=!me.is_admin;$('#who').textContent=me.username;
+  $('#btnUsers').hidden=!me.is_admin;$('#uname').textContent=me.username;
   await loadMeta();loadMovements();loadChart();
 }
 $('#lb').onclick=async()=>{
@@ -324,7 +360,7 @@ $('#usBody').onchange=async e=>{if(e.target.dataset.tg)try{await api('/users/'+e
 $('#usBody').onclick=async e=>{
   const d=e.target.dataset;
   try{
-    if(d.pw){const p=prompt('Nueva contraseña (mínimo 8 caracteres):');if(p)await api('/users/'+d.pw,{method:'PATCH',body:{password:p}})}
+    if(d.pw){const p=prompt('Nueva contraseña (mínimo 8 caracteres, con mayúscula, minúscula y número):');if(p)await api('/users/'+d.pw,{method:'PATCH',body:{password:p}})}
     if(d.du&&confirm('¿Eliminar el usuario y TODOS sus datos?')){await api('/users/'+d.du,{method:'DELETE'});loadUsers()}
   }catch(x){fail(x)}
 };
@@ -333,6 +369,31 @@ $('#usForm').onsubmit=async e=>{e.preventDefault();
     ['#uName','#uPass','#uTg'].forEach(s=>$(s).value='');loadUsers()}catch(x){fail(x)}};
 
 $('#bHelp').onclick=()=>$('#dHelp').showModal();
+
+/* ---- menú de usuario ---- */
+const menu=$('#menu');
+const closeMenu=()=>{menu.hidden=true;$('#bMenu').setAttribute('aria-expanded','false')};
+$('#bMenu').onclick=e=>{e.stopPropagation();menu.hidden=!menu.hidden;$('#bMenu').setAttribute('aria-expanded',String(!menu.hidden))};
+document.addEventListener('click',e=>{if(!e.target.closest('.dd'))closeMenu()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
+menu.addEventListener('click',closeMenu);
+
+/* ---- perfil / cambio de contraseña ---- */
+const PW_RULES='La contraseña debe tener entre 8 y 64 caracteres, con al menos una mayúscula, una minúscula y un número, y sin espacios ni caracteres raros.';
+const pwOk=v=>v.length>=8&&v.length<=64&&/[a-z]/.test(v)&&/[A-Z]/.test(v)&&/[0-9]/.test(v)&&/^[\x21-\x7E]+$/.test(v);
+function pwMsg(t,ok){const m=$('#pwMsg');m.textContent=t;m.className=ok?'pos':'neg'}
+function pwReset(){$('#pwForm').hidden=true;$('#pPwBtn').hidden=false;$('#pwForm').reset()}
+$('#mProfile').onclick=()=>{$('#pUser').textContent=me.username;$('#pTg').textContent=me.telegram_id??'No asignado';pwMsg('');pwReset();$('#dProf').showModal()};
+$('#pPwBtn').onclick=()=>{pwMsg('');$('#pwForm').hidden=false;$('#pPwBtn').hidden=true;$('#pwCur').focus()};
+$('#pwCancel').onclick=()=>{pwMsg('');pwReset()};
+$('#pwForm').onsubmit=async e=>{
+  e.preventDefault();
+  const cur=$('#pwCur').value,n1=$('#pwNew').value,n2=$('#pwNew2').value;
+  if(n1!==n2)return pwMsg('Las contraseñas nuevas no coinciden.');
+  if(!pwOk(n1))return pwMsg(PW_RULES);
+  try{await api('/me/password',{method:'POST',body:{current:cur,password:n1,confirm:n2}});pwReset();pwMsg('✅ Contraseña actualizada correctamente.',true)}
+  catch(x){pwMsg(x.message)}
+};
 boot();
 </script>
 </body>
