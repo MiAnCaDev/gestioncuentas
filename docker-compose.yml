@@ -2,7 +2,7 @@ services:
   gastos:
     build: .
     container_name: gastos
-    restart: unless-stopped
+    restart: always
     ports:
       # Puerto publicado = el del túnel de Cloudflare (http://localhost:8234).
       # Solo escucha en localhost; quita "127.0.0.1:" si necesitas acceder desde la red local.
