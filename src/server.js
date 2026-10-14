@@ -72,8 +72,9 @@ app.post('/api/logout', auth, (req, res) => {
 
 app.get('/api/me', auth, (req, res) => res.json({
   username: req.user.username, telegram_id: req.user.telegram_id, is_admin: !!req.user.is_admin,
-  daily_report: !!req.user.daily_report, monthly_report: !!req.user.monthly_report
+  daily_report: !!req.user.daily_report, monthly_report: !!req.user.monthly_report, theme: req.user.theme
 }));
+app.patch('/api/me/theme', auth, (req, res) => send(res, core.setTheme(req.user.id, (req.body || {}).theme)));
 app.patch('/api/me/prefs', auth, (req, res) => send(res, core.setReportPrefs(req.user.id, req.body || {})));
 app.post('/api/me/password', auth, (req, res) => {
   const { current, password, confirm } = req.body || {};

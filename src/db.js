@@ -60,6 +60,8 @@ const userCols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
 if (!userCols.includes('daily_report')) db.exec('ALTER TABLE users ADD COLUMN daily_report INTEGER NOT NULL DEFAULT 1');
 if (!userCols.includes('monthly_report')) db.exec('ALTER TABLE users ADD COLUMN monthly_report INTEGER NOT NULL DEFAULT 1');
 
+if (!userCols.includes('theme')) db.exec("ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'auto'"); // auto = según el sistema
+
 /* ---------- utilidades ---------- */
 const pad = n => String(n).padStart(2, '0');
 const fmtDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -136,6 +138,12 @@ function changeOwnPassword(uid, token, current, pw, confirm) {
   db.prepare('UPDATE users SET password_hash=? WHERE id=?').run(bcrypt.hashSync(pw, 10), uid);
   db.prepare('DELETE FROM sessions WHERE user_id=? AND token<>?').run(uid, token); // cierra el resto de sesiones
   return { ok: true };
+}
+
+function setTheme(uid, theme) {
+  if (theme !== 'light' && theme !== 'dark') return { error: 'Tema inválido' };
+  db.prepare('UPDATE users SET theme=? WHERE id=?').run(theme, uid);
+  return { ok: true, theme };
 }
 
 function setReportPrefs(uid, { daily_report, monthly_report } = {}) {
@@ -407,7 +415,7 @@ function monthlyReport(uid, ref = new Date()) {
 
 module.exports = {
   db, eur, sg, toCents, fmtDate,
-  createUser, updateUser, changeOwnPassword, setReportPrefs, userByTelegram, telegramUsers,
+  createUser, updateUser, changeOwnPassword, setReportPrefs, setTheme, userByTelegram, telegramUsers,
   listTypes, addType, deleteType,
   accountsWithBalance, addAccount, setActive, setRealBalance,
   addMovement, editMovement, deleteMovement, listMovements,

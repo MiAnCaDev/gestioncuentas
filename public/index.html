@@ -5,10 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 <title>Mis gastos</title>
+<script>try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
-:root{--bg:#f4f5f7;--card:#fff;--tx:#1d2330;--mut:#6b7385;--bd:#dde1e8;--pri:#2563eb;--neg:#c62828;--pos:#2e7d32}
-@media(prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2029;--tx:#e6e9f0;--mut:#9099ad;--bd:#2c3340;--pri:#6c9bff;--neg:#ff7b72;--pos:#62d26f}}
+:root{--bg:#f4f5f7;--card:#fff;--tx:#1d2330;--mut:#6b7385;--bd:#dde1e8;--pri:#2563eb;--neg:#c62828;--pos:#2e7d32;color-scheme:light dark}
+:root[data-theme=light]{color-scheme:light}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#12151c;--card:#1b2029;--tx:#e6e9f0;--mut:#9099ad;--bd:#2c3340;--pri:#6c9bff;--neg:#ff7b72;--pos:#62d26f}}
+:root[data-theme=dark]{--bg:#12151c;--card:#1b2029;--tx:#e6e9f0;--mut:#9099ad;--bd:#2c3340;--pri:#6c9bff;--neg:#ff7b72;--pos:#62d26f;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;font:15px/1.4 system-ui,sans-serif;background:var(--bg);color:var(--tx)}
 header{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:5}
@@ -75,6 +78,7 @@ dialog h2{margin:0 0 10px;font-size:17px}
       <a href="/api/export.csv" download>📥 Descargar CSV</a>
       <a href="https://t.me/gestioncuentas_bot" target="_blank" rel="noopener noreferrer">🤖 Bot de Telegram</a>
       <button id="bHelp">❓ Ayuda</button>
+      <button id="mTheme">🌙 Modo noche</button>
       <button id="bOut">🚪 Salir</button>
     </div>
   </div>
@@ -131,6 +135,7 @@ dialog h2{margin:0 0 10px;font-size:17px}
 <li><b>Tipos</b>: crea o elimina tipos. Si un tipo tiene movimientos, deberás moverlos a otro tipo antes de borrarlo.</li>
 <li>Las cuentas conjuntas no cuentan en tu dinero total personal.</li>
 <li><b>Descargar CSV</b> (menú de tu usuario ☰): descarga todos tus gastos/ingresos, del más antiguo al más nuevo.</li>
+<li><b>Modo noche / claro</b> (menú de tu usuario ☰): alterna entre tema claro y oscuro. Se guarda en tu cuenta, así que se mantiene en cualquier navegador.</li>
 <li><b>Perfil</b> (menú de tu usuario ☰): consulta tus datos, activa o desactiva los informes diario y mensual de Telegram y cambia tu contraseña. El ID de Telegram solo lo puede modificar el administrador.</li>
 </ul>
 <p><b>Bot de Telegram</b> (<a href="https://t.me/gestioncuentas_bot" target="_blank" rel="noopener noreferrer">t.me/gestioncuentas_bot</a>, solo usuarios registrados): /nuevo, /borrar, /ultimos, /saldos, /saldoreal, /activar, /desactivar, /nuevacuenta, /nuevotipo, /tipos, /web, /uso, /exportar (CSV) (enlace a esta web), /help. Recibes un informe diario a las 9:00 y uno mensual el día 1 a las 9:00.</p>
@@ -215,6 +220,7 @@ const opts=(l,blank)=>(blank!==undefined?`<option value="">${blank}</option>`:''
 function showLogin(){$('#app').hidden=true;$('#login').hidden=false}
 async function boot(){
   try{me=await api('/me')}catch{return showLogin()}
+  applyTheme(me.theme);
   $('#login').hidden=true;$('#app').hidden=false;
   $('#btnUsers').hidden=!me.is_admin;$('#uname').textContent=me.username;
   await loadMeta();loadMovements();loadChart();
@@ -300,7 +306,9 @@ $('#addForm').onsubmit=async e=>{
 async function loadChart(){
   const d=await api('/evolution?joint='+($('#incJoint').checked?1:0)).catch(()=>[]);
   if(chart)chart.destroy();
-  chart=new Chart($('#chart'),{type:'line',data:{labels:d.map(x=>x.month),datasets:[{label:'Dinero total',data:d.map(x=>x.total/100),tension:.25,fill:true,borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.15)'}]},
+  const cs=getComputedStyle(document.documentElement);
+  Chart.defaults.color=cs.getPropertyValue('--mut').trim();Chart.defaults.borderColor=cs.getPropertyValue('--bd').trim();
+  chart=new Chart($('#chart'),{type:'line',data:{labels:d.map(x=>x.month),datasets:[{label:'Dinero total',data:d.map(x=>x.total/100),tension:.25,fill:true,borderColor:cs.getPropertyValue('--pri').trim(),backgroundColor:'rgba(37,99,235,.15)'}]},
     options:{maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>eur(Math.round(c.raw*100))}}},scales:{y:{ticks:{callback:v=>v.toLocaleString('es-ES',{minimumFractionDigits:2})}}}}});
 }
 $('#incJoint').onchange=loadChart;
@@ -384,6 +392,22 @@ $('#bMenu').onclick=e=>{e.stopPropagation();menu.hidden=!menu.hidden;$('#bMenu')
 document.addEventListener('click',e=>{if(!e.target.closest('.dd'))closeMenu()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
 menu.addEventListener('click',closeMenu);
+
+/* ---- modo claro / oscuro (se guarda en el servidor, por usuario) ---- */
+const sysDark=matchMedia('(prefers-color-scheme: dark)');
+const effTheme=()=>me&&me.theme&&me.theme!=='auto'?me.theme:(sysDark.matches?'dark':'light');
+function applyTheme(t){
+  if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;else delete document.documentElement.dataset.theme;
+  try{localStorage.setItem('theme',t||'auto')}catch(e){}
+  $('#mTheme').textContent=effTheme()==='dark'?'☀️ Modo claro':'🌙 Modo noche';
+}
+sysDark.addEventListener('change',()=>{if(me&&me.theme==='auto'){applyTheme('auto');loadChart()}});
+$('#mTheme').onclick=async()=>{
+  const prev=me.theme,next=effTheme()==='dark'?'light':'dark';
+  me.theme=next;applyTheme(next);loadChart();
+  try{await api('/me/theme',{method:'PATCH',body:{theme:next}})}
+  catch(e){me.theme=prev;applyTheme(prev);loadChart();alert(e.message)}
+};
 
 /* ---- perfil / cambio de contraseña ---- */
 const PW_RULES='La contraseña debe tener entre 8 y 64 caracteres, con al menos una mayúscula, una minúscula y un número, y sin espacios ni caracteres raros.';
